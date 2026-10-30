@@ -1,0 +1,10 @@
+{
+  "name": "Mr Nikku",
+  "description": "Live mobile screen sharing and audio casting platform with real WebRTC streaming and secure invitation links.",
+  "requestFramePermissions": [
+    "display-capture"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

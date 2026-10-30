@@ -1,0 +1,143 @@
+{
+  "entities": {
+    "Room": {
+      "title": "Room",
+      "description": "A live screen sharing session created by a host",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique room identifier",
+          "maxLength": 64
+        },
+        "hostId": {
+          "type": "string",
+          "description": "Host participant ID or UID",
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "number",
+          "description": "Creation timestamp in milliseconds"
+        },
+        "expiresAt": {
+          "type": "number",
+          "description": "Expiration timestamp in milliseconds"
+        },
+        "requiresPin": {
+          "type": "boolean",
+          "description": "Whether room requires a PIN"
+        },
+        "pinHash": {
+          "type": "string",
+          "description": "Optional SHA-256 hash of room PIN",
+          "maxLength": 64
+        },
+        "tokenHash": {
+          "type": "string",
+          "description": "SHA-256 hash of security access token",
+          "maxLength": 64
+        },
+        "isRevoked": {
+          "type": "boolean",
+          "description": "Whether host revoked the room"
+        },
+        "hasAudio": {
+          "type": "boolean",
+          "description": "Whether host stream includes audio track"
+        },
+        "audioSource": {
+          "type": "string",
+          "description": "Audio source category",
+          "enum": ["system-screen", "mic-mix", "none"]
+        },
+        "viewerCount": {
+          "type": "number",
+          "description": "Current number of active viewers"
+        }
+      },
+      "required": ["id", "hostId", "createdAt", "expiresAt", "tokenHash", "isRevoked"]
+    },
+    "Participant": {
+      "title": "Participant",
+      "description": "A host or viewer connected to a room",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Participant ID",
+          "maxLength": 64
+        },
+        "role": {
+          "type": "string",
+          "description": "Role in room",
+          "enum": ["host", "viewer"]
+        },
+        "joinedAt": {
+          "type": "number",
+          "description": "Join timestamp"
+        },
+        "lastSeen": {
+          "type": "number",
+          "description": "Heartbeat timestamp"
+        }
+      },
+      "required": ["id", "role", "joinedAt"]
+    },
+    "SignalingMessage": {
+      "title": "SignalingMessage",
+      "description": "WebRTC SDP offer, answer, or ICE candidate message",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Message ID",
+          "maxLength": 64
+        },
+        "senderId": {
+          "type": "string",
+          "description": "Sender participant ID",
+          "maxLength": 64
+        },
+        "targetId": {
+          "type": "string",
+          "description": "Target recipient ID",
+          "maxLength": 64
+        },
+        "roomId": {
+          "type": "string",
+          "description": "Associated room ID",
+          "maxLength": 64
+        },
+        "type": {
+          "type": "string",
+          "description": "Signaling message type",
+          "enum": ["offer", "answer", "ice-candidate", "join-request", "leave", "revoke", "ping"]
+        },
+        "payload": {
+          "type": "string",
+          "description": "JSON stringified SDP or candidate payload",
+          "maxLength": 65536
+        },
+        "timestamp": {
+          "type": "number",
+          "description": "Transmission timestamp"
+        }
+      },
+      "required": ["id", "senderId", "targetId", "roomId", "type", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/rooms/{roomId}": {
+      "schema": "Room",
+      "description": "Stores room metadata and status"
+    },
+    "/rooms/{roomId}/participants/{participantId}": {
+      "schema": "Participant",
+      "description": "Stores room participants and presence"
+    },
+    "/rooms/{roomId}/signaling/{messageId}": {
+      "schema": "SignalingMessage",
+      "description": "Signaling mailbox for WebRTC negotiation"
+    }
+  }
+}

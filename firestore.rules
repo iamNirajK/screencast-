@@ -1,0 +1,96 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Validation Blueprint: Room
+    function isValidRoom(data) {
+      return data.keys().hasAll(['id', 'hostId', 'createdAt', 'expiresAt', 'tokenHash', 'isRevoked'])
+        && data.id is string && data.id.size() <= 64
+        && data.hostId is string && data.hostId.size() <= 128
+        && data.createdAt is number
+        && data.expiresAt is number && data.expiresAt > data.createdAt
+        && data.tokenHash is string && data.tokenHash.size() == 64
+        && data.isRevoked is bool
+        && (!('pinHash' in data) || (data.pinHash is string && data.pinHash.size() == 64))
+        && (!('requiresPin' in data) || data.requiresPin is bool)
+        && (!('hasAudio' in data) || data.hasAudio is bool)
+        && (!('audioSource' in data) || (data.audioSource in ['system-screen', 'mic-mix', 'none']))
+        && (!('viewerCount' in data) || (data.viewerCount is number && data.viewerCount >= 0));
+    }
+
+    // Validation Blueprint: Participant
+    function isValidParticipant(data, participantId) {
+      return data.keys().hasAll(['id', 'role', 'joinedAt'])
+        && data.id is string && data.id == participantId && data.id.size() <= 64
+        && data.role in ['host', 'viewer']
+        && data.joinedAt is number
+        && (!('lastSeen' in data) || data.lastSeen is number);
+    }
+
+    // Validation Blueprint: SignalingMessage
+    function isValidSignalingMessage(data, roomId) {
+      return data.keys().hasAll(['id', 'senderId', 'targetId', 'roomId', 'type', 'timestamp'])
+        && data.id is string && data.id.size() <= 64
+        && data.senderId is string && data.senderId.size() <= 64
+        && data.targetId is string && data.targetId.size() <= 64
+        && data.roomId is string && data.roomId == roomId
+        && data.type in ['offer', 'answer', 'ice-candidate', 'join-request', 'leave', 'revoke', 'ping']
+        && (!('payload' in data) || (data.payload is string && data.payload.size() <= 65536))
+        && data.timestamp is number;
+    }
+
+    // Rooms collection
+    match /rooms/{roomId} {
+      allow get: if isValidId(roomId);
+      allow create: if isValidId(roomId)
+        && isValidRoom(incoming())
+        && incoming().id == roomId;
+      allow update: if isValidId(roomId)
+        && isValidRoom(incoming())
+        && incoming().id == existing().id
+        && incoming().createdAt == existing().createdAt
+        && incoming().tokenHash == existing().tokenHash;
+      allow delete: if isValidId(roomId);
+
+      // Subcollection: Participants
+      match /participants/{participantId} {
+        allow get, list: if isValidId(roomId) && isValidId(participantId);
+        allow create, update: if isValidId(roomId)
+          && isValidId(participantId)
+          && isValidParticipant(incoming(), participantId);
+        allow delete: if isValidId(roomId) && isValidId(participantId);
+      }
+
+      // Subcollection: Signaling Mailbox
+      match /signaling/{messageId} {
+        allow get, list: if isValidId(roomId) && isValidId(messageId);
+        allow create: if isValidId(roomId)
+          && isValidId(messageId)
+          && isValidSignalingMessage(incoming(), roomId);
+        allow delete: if isValidId(roomId) && isValidId(messageId);
+      }
+    }
+  }
+}

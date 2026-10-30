@@ -1,0 +1,114 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "rooms": {
+      "$roomId": {
+        // Room metadata rules
+        "metadata": {
+          // Allow read if user is authenticated (anonymous or verified)
+          ".read": "auth != null",
+          // Only the host can create or revoke the room
+          ".write": "auth != null && (!data.exists() || data.child('hostId').val() === auth.uid)",
+          ".validate": "newData.hasChildren(['id', 'hostId', 'createdAt', 'expiresAt', 'tokenHash', 'isRevoked'])",
+          "id": {
+            ".validate": "newData.isString() && newData.val().length <= 32"
+          },
+          "hostId": {
+            ".validate": "newData.isString() && newData.val().length <= 64"
+          },
+          "createdAt": {
+            ".validate": "newData.isNumber()"
+          },
+          "expiresAt": {
+            ".validate": "newData.isNumber() && newData.val() > newData.parent().child('createdAt').val()"
+          },
+          "tokenHash": {
+            ".validate": "newData.isString() && newData.val().length === 64"
+          },
+          "pinHash": {
+            ".validate": "!newData.exists() || (newData.isString() && newData.val().length === 64)"
+          },
+          "isRevoked": {
+            ".validate": "newData.isBoolean()"
+          },
+          "hasAudio": {
+            ".validate": "newData.isBoolean()"
+          },
+          "audioSource": {
+            ".validate": "!newData.exists() || (newData.isString() && (newData.val() == 'system-screen' || newData.val() == 'mic-mix' || newData.val() == 'none'))"
+          },
+          "viewerCount": {
+            ".validate": "newData.isNumber() && newData.val() >= 0"
+          },
+          "$other": {
+            ".validate": false
+          }
+        },
+
+        // Participant presence registration
+        "participants": {
+          ".read": "auth != null",
+          "$participantId": {
+            // Participant can write their own presence
+            ".write": "auth != null",
+            ".validate": "newData.hasChildren(['id', 'role', 'joinedAt'])",
+            "id": {
+              ".validate": "newData.isString() && newData.val() === $participantId"
+            },
+            "role": {
+              ".validate": "newData.isString() && (newData.val() == 'host' || newData.val() == 'viewer')"
+            },
+            "joinedAt": {
+              ".validate": "newData.isNumber()"
+            },
+            "lastSeen": {
+              ".validate": "!newData.exists() || newData.isNumber()"
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
+        },
+
+        // Signaling inboxes (messages partitioned by recipient ID)
+        "signaling": {
+          "$targetId": {
+            // Only the intended target can read their signaling inbox
+            ".read": "auth != null",
+            "$messageId": {
+              // Any authorized room participant can push a signaling message to this inbox
+              ".write": "auth != null",
+              ".validate": "newData.hasChildren(['id', 'senderId', 'targetId', 'type', 'timestamp'])",
+              "id": {
+                ".validate": "newData.isString()"
+              },
+              "senderId": {
+                ".validate": "newData.isString() && newData.val().length <= 64"
+              },
+              "targetId": {
+                ".validate": "newData.isString() && newData.val() === $targetId"
+              },
+              "roomId": {
+                ".validate": "newData.isString() && newData.val() === $roomId"
+              },
+              "type": {
+                ".validate": "newData.isString() && (newData.val() == 'offer' || newData.val() == 'answer' || newData.val() == 'ice-candidate' || newData.val() == 'join-request' || newData.val() == 'leave' || newData.val() == 'revoke' || newData.val() == 'ping')"
+              },
+              "payload": {
+                // Allows SDP payload or ICE candidate object
+                ".validate": true
+              },
+              "timestamp": {
+                ".validate": "newData.isNumber()"
+              },
+              "$other": {
+                ".validate": false
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
